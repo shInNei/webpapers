@@ -1,6 +1,6 @@
 .*
 *.log
-papers/*
+# papers/*
 !papers/config.ini
 !papers/journal.txt
 !papers/paperlist.md

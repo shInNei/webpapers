@@ -1,0 +1,59 @@
+name: Deploy Webpapers to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # Chạy action mỗi khi bạn push code/PDF lên nhánh main
+  workflow_dispatch: # Cho phép bạn bấm chạy thủ công trên giao diện GitHub nếu cần
+
+# Cấp quyền cho GitHub Actions được phép ghi đè file lên GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Kéo dữ liệu của bạn về (PDF & BibTeX)
+        uses: actions/checkout@v4
+        with:
+          path: my-data
+
+      - name: 2. Kéo mã nguồn engine của Webpapers về
+        uses: actions/checkout@v4
+        with:
+          repository: ryichando/webpapers
+          path: engine
+
+      - name: 3. Build Docker Image cho Webpapers
+        run: |
+          cd engine
+          docker build . -t webpapers
+
+      - name: 4. Chạy Container để render giao diện Web
+        # Mount thư mục my-data vào /root trong container để nó đọc thư mục 'papers'
+        # Bỏ cờ -ti (interactive) của tác giả vì môi trường CI không có terminal tương tác
+        run: |
+          docker run -v ${{ github.workspace }}/my-data:/root --rm webpapers papers
+
+      - name: 5. Cấu hình GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: 6. Đóng gói thư mục thành Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Chỉ lấy thư mục papers (nơi vừa được Docker đẻ ra file index.html) để up lên web
+          path: './my-data/papers'
+
+      - name: 7. Deploy lên mạng
+        id: deployment
+        uses: actions/deploy-pages@v4
